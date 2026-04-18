@@ -1,7 +1,17 @@
 import prisma from "../config/db.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { QuestionType } from "@prisma/client";
 
-export async function addQuestion(quizId, teacherId, data) {
+interface QuestionData {
+  type?: QuestionType;
+  text?: string;
+  imageUrl?: string | null;
+  options?: Array<{ text: string; isCorrect: boolean }> | null;
+  correctAnswer?: string | null;
+  points?: number;
+}
+
+export async function addQuestion(quizId: string, teacherId: string, data: QuestionData) {
   const quiz = await prisma.quiz.findUnique({ where: { id: quizId } });
   if (!quiz) throw new AppError("Quiz not found", 404);
   if (quiz.teacherId !== teacherId) throw new AppError("Not authorized", 403);
@@ -13,14 +23,21 @@ export async function addQuestion(quizId, teacherId, data) {
 
   return prisma.question.create({
     data: {
-      ...data,
+      ...(data as {
+        type: QuestionType;
+        text: string;
+        imageUrl?: string | null;
+        options?: Array<{ text: string; isCorrect: boolean }> | null;
+        correctAnswer?: string | null;
+        points?: number;
+      }),
       quizId,
       order: (maxOrder._max.order ?? -1) + 1,
     },
   });
 }
 
-export async function updateQuestion(id, teacherId, data) {
+export async function updateQuestion(id: string, teacherId: string, data: QuestionData) {
   const question = await prisma.question.findUnique({
     where: { id },
     include: { quiz: { select: { teacherId: true } } },
@@ -31,7 +48,7 @@ export async function updateQuestion(id, teacherId, data) {
   return prisma.question.update({ where: { id }, data });
 }
 
-export async function deleteQuestion(id, teacherId) {
+export async function deleteQuestion(id: string, teacherId: string) {
   const question = await prisma.question.findUnique({
     where: { id },
     include: { quiz: { select: { teacherId: true } } },
@@ -42,7 +59,7 @@ export async function deleteQuestion(id, teacherId) {
   return prisma.question.delete({ where: { id } });
 }
 
-export async function reorderQuestions(quizId, teacherId, questionIds) {
+export async function reorderQuestions(quizId: string, teacherId: string, questionIds: string[]) {
   const quiz = await prisma.quiz.findUnique({ where: { id: quizId } });
   if (!quiz) throw new AppError("Quiz not found", 404);
   if (quiz.teacherId !== teacherId) throw new AppError("Not authorized", 403);

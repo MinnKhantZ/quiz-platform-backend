@@ -1,6 +1,8 @@
 // Mock for @prisma/client — reused across all test files.
 // Import via: import prisma from '../src/config/db.js' after vi.mock('../src/config/db.js')
 
+import { vi } from "vitest";
+
 export const prismaMock = {
   user: {
     findUnique: vi.fn(),
@@ -30,7 +32,7 @@ export const prismaMock = {
   answer: {
     createMany: vi.fn(),
   },
-  $transaction: vi.fn((fn) => fn(prismaMock)),
+  $transaction: vi.fn((fn: (prisma: typeof prismaMock) => unknown) => fn(prismaMock)),
 };
 
 export default prismaMock;

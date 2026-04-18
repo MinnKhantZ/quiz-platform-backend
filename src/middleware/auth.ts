@@ -1,8 +1,10 @@
+import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/jwt.js";
 import { AppError } from "./errorHandler.js";
 import prisma from "../config/db.js";
+import { Role } from "@prisma/client";
 
-export async function authenticate(req, res, next) {
+export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const header = req.headers.authorization;
     if (!header || !header.startsWith("Bearer ")) {
@@ -24,13 +26,13 @@ export async function authenticate(req, res, next) {
     req.user = user;
     next();
   } catch (err) {
-    if (err.isOperational) return next(err);
+    if (err instanceof AppError) return next(err);
     next(new AppError("Invalid or expired token", 401));
   }
 }
 
-export function requireRole(...roles) {
-  return (req, res, next) => {
+export function requireRole(...roles: Role[]) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {
       return next(new AppError("Insufficient permissions", 403));
     }

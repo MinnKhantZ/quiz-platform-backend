@@ -1,25 +1,33 @@
+import { Server, Socket } from "socket.io";
 import prisma from "../config/db.js";
-import { verifyToken } from "../utils/jwt.js";
+import { verifyToken, JwtPayload } from "../utils/jwt.js";
+import { Question } from "@prisma/client";
 
-export function setupSocket(io) {
+interface AuthenticatedSocket extends Socket {
+  user: JwtPayload;
+  sessionId?: string;
+}
+
+export function setupSocket(io: Server): void {
   // Authenticate socket connections
   io.use((socket, next) => {
     try {
-      const token = socket.handshake.auth.token;
+      const token = (socket.handshake.auth as { token?: string }).token;
       if (!token) return next(new Error("Authentication required"));
       const decoded = verifyToken(token);
-      socket.user = decoded;
+      (socket as AuthenticatedSocket).user = decoded;
       next();
     } catch {
       next(new Error("Invalid token"));
     }
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", (rawSocket) => {
+    const socket = rawSocket as AuthenticatedSocket;
     console.log(`Socket connected: ${socket.user.id}`);
 
     // Teacher creates a live session
-    socket.on("create-session", async ({ quizId }, callback) => {
+    socket.on("create-session", async ({ quizId }: { quizId: string }, callback: (res: object) => void) => {
       try {
         const joinCode = generateJoinCode();
         const session = await prisma.liveSession.create({
@@ -30,12 +38,12 @@ export function setupSocket(io) {
         socket.sessionId = session.id;
         callback({ success: true, session: { id: session.id, joinCode, quiz: session.quiz } });
       } catch (err) {
-        callback({ success: false, error: err.message });
+        callback({ success: false, error: (err as Error).message });
       }
     });
 
     // Student joins a live session
-    socket.on("join-session", async ({ joinCode }, callback) => {
+    socket.on("join-session", async ({ joinCode }: { joinCode: string }, callback: (res: object) => void) => {
       try {
         const session = await prisma.liveSession.findUnique({
           where: { joinCode },
@@ -57,12 +65,12 @@ export function setupSocket(io) {
 
         callback({ success: true, session: { id: session.id, quiz: session.quiz, status: session.status } });
       } catch (err) {
-        callback({ success: false, error: err.message });
+        callback({ success: false, error: (err as Error).message });
       }
     });
 
     // Teacher starts the session
-    socket.on("start-session", async (callback) => {
+    socket.on("start-session", async (callback: (res: object) => void) => {
       try {
         const session = await prisma.liveSession.update({
           where: { id: socket.sessionId },
@@ -81,17 +89,18 @@ export function setupSocket(io) {
 
         callback({ success: true });
       } catch (err) {
-        callback({ success: false, error: err.message });
+        callback({ success: false, error: (err as Error).message });
       }
     });
 
     // Teacher advances to next question
-    socket.on("next-question", async (callback) => {
+    socket.on("next-question", async (callback: (res: object) => void) => {
       try {
         const session = await prisma.liveSession.findUnique({
           where: { id: socket.sessionId },
           include: { quiz: { include: { questions: { orderBy: { order: "asc" } } } } },
         });
+        if (!session) return callback({ success: false, error: "Session not found" });
 
         const nextIndex = session.currentQuestion + 1;
         if (nextIndex >= session.quiz.questions.length) {
@@ -117,44 +126,58 @@ export function setupSocket(io) {
 
         callback({ success: true, finished: false });
       } catch (err) {
-        callback({ success: false, error: err.message });
+        callback({ success: false, error: (err as Error).message });
       }
     });
 
     // Student submits an answer in live session
-    socket.on("live-answer", async ({ questionId, selectedOption, textAnswer }, callback) => {
-      try {
-        const session = await prisma.liveSession.findUnique({
-          where: { id: socket.sessionId },
-          include: { quiz: { include: { questions: true } } },
-        });
+    socket.on(
+      "live-answer",
+      async (
+        { questionId, selectedOption, textAnswer }: { questionId: string; selectedOption?: number; textAnswer?: string },
+        callback: (res: object) => void
+      ) => {
+        try {
+          const session = await prisma.liveSession.findUnique({
+            where: { id: socket.sessionId },
+            include: { quiz: { include: { questions: true } } },
+          });
+          if (!session) return callback({ success: false, error: "Session not found" });
 
-        const question = session.quiz.questions.find((q) => q.id === questionId);
-        if (!question) return callback({ success: false, error: "Question not found" });
+          const question = session.quiz.questions.find((q) => q.id === questionId);
+          if (!question) return callback({ success: false, error: "Question not found" });
 
-        let isCorrect = false;
-        if (question.type === "MCQ" || question.type === "TRUE_FALSE") {
-          const correctIndex = question.options.findIndex((opt) => opt.isCorrect);
-          isCorrect = selectedOption === correctIndex;
-        } else if (question.type === "FILL_BLANK") {
-          isCorrect = question.correctAnswer?.trim().toLowerCase() === textAnswer?.trim().toLowerCase();
+          const options = question.options as Array<{ text: string; isCorrect: boolean }> | null;
+
+          let isCorrect = false;
+          if (question.type === "MCQ" || question.type === "TRUE_FALSE") {
+            if (options) {
+              const correctIndex = options.findIndex((opt) => opt.isCorrect);
+              isCorrect = selectedOption === correctIndex;
+            }
+          } else if (question.type === "FILL_BLANK") {
+            isCorrect =
+              !!question.correctAnswer &&
+              question.correctAnswer.trim().toLowerCase() === textAnswer?.trim().toLowerCase();
+          }
+
+          // Notify teacher of the answer
+          socket.to(`session:${session.id}`).emit("answer-received", {
+            studentId: socket.user.id,
+            questionId,
+            selectedOption,
+            isCorrect,
+          });
+
+          callback({ success: true, isCorrect });
+        } catch (err) {
+          callback({ success: false, error: (err as Error).message });
         }
-
-        // Notify teacher of the answer
-        socket.to(`session:${session.id}`).emit("answer-received", {
-          studentId: socket.user.id,
-          questionId,
-          isCorrect,
-        });
-
-        callback({ success: true, isCorrect });
-      } catch (err) {
-        callback({ success: false, error: err.message });
       }
-    });
+    );
 
     // Teacher ends session
-    socket.on("end-session", async (callback) => {
+    socket.on("end-session", async (callback: (res: object) => void) => {
       try {
         if (socket.sessionId) {
           await prisma.liveSession.update({
@@ -165,7 +188,7 @@ export function setupSocket(io) {
         }
         callback({ success: true });
       } catch (err) {
-        callback({ success: false, error: err.message });
+        callback({ success: false, error: (err as Error).message });
       }
     });
 
@@ -175,7 +198,7 @@ export function setupSocket(io) {
   });
 }
 
-function generateJoinCode() {
+function generateJoinCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < 6; i++) {
@@ -184,13 +207,14 @@ function generateJoinCode() {
   return code;
 }
 
-function sanitizeQuestion(question) {
+function sanitizeQuestion(question: Question) {
+  const options = question.options as Array<{ text: string; isCorrect: boolean }> | null;
   return {
     id: question.id,
     type: question.type,
     text: question.text,
     imageUrl: question.imageUrl,
-    options: question.options?.map((o) => ({ text: o.text })),
+    options: options?.map((o) => ({ text: o.text })),
     points: question.points,
   };
 }

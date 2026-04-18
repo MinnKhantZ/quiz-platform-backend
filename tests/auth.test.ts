@@ -11,8 +11,6 @@ describe("auth.service", () => {
     vi.clearAllMocks();
   });
 
-  // ─── register ────────────────────────────────────────────────────────────────
-
   describe("register", () => {
     it("creates a user and returns a JWT token", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
@@ -44,11 +42,8 @@ describe("auth.service", () => {
     });
   });
 
-  // ─── login ───────────────────────────────────────────────────────────────────
-
   describe("login", () => {
     it("returns user and token with correct credentials", async () => {
-      // bcrypt hash of "password123"
       const { default: bcrypt } = await import("bcrypt");
       const hashed = await bcrypt.hash("password123", 10);
 
@@ -89,8 +84,6 @@ describe("auth.service", () => {
       ).rejects.toMatchObject({ statusCode: 401 });
     });
   });
-
-  // ─── getMe ───────────────────────────────────────────────────────────────────
 
   describe("getMe", () => {
     it("returns user by id", async () => {

@@ -1,15 +1,30 @@
 import prisma from "../config/db.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { TimerType } from "@prisma/client";
 
-export async function createQuiz(teacherId, data) {
+interface QuizFilter {
+  teacherId?: string;
+  published?: boolean;
+}
+
+interface QuizData {
+  title?: string;
+  description?: string | null;
+  category?: string | null;
+  timerType?: TimerType;
+  timerSeconds?: number | null;
+  isPublished?: boolean;
+}
+
+export async function createQuiz(teacherId: string, data: QuizData) {
   return prisma.quiz.create({
     data: { ...data, teacherId },
     include: { questions: true },
   });
 }
 
-export async function getQuizzes({ teacherId, published } = {}) {
-  const where = {};
+export async function getQuizzes({ teacherId, published }: QuizFilter = {}) {
+  const where: { teacherId?: string; isPublished?: boolean } = {};
   if (teacherId) where.teacherId = teacherId;
   if (published !== undefined) where.isPublished = published;
 
@@ -23,7 +38,7 @@ export async function getQuizzes({ teacherId, published } = {}) {
   });
 }
 
-export async function getQuizById(id, includeAnswers = false) {
+export async function getQuizById(id: string, includeAnswers = false) {
   const quiz = await prisma.quiz.findUnique({
     where: { id },
     include: {
@@ -48,7 +63,7 @@ export async function getQuizById(id, includeAnswers = false) {
   return quiz;
 }
 
-export async function updateQuiz(id, teacherId, data) {
+export async function updateQuiz(id: string, teacherId: string, data: QuizData) {
   const quiz = await prisma.quiz.findUnique({ where: { id } });
   if (!quiz) throw new AppError("Quiz not found", 404);
   if (quiz.teacherId !== teacherId) throw new AppError("Not authorized", 403);
@@ -60,7 +75,7 @@ export async function updateQuiz(id, teacherId, data) {
   });
 }
 
-export async function deleteQuiz(id, teacherId) {
+export async function deleteQuiz(id: string, teacherId: string) {
   const quiz = await prisma.quiz.findUnique({ where: { id } });
   if (!quiz) throw new AppError("Quiz not found", 404);
   if (quiz.teacherId !== teacherId) throw new AppError("Not authorized", 403);

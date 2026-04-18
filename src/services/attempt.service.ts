@@ -1,7 +1,13 @@
 import prisma from "../config/db.js";
 import { AppError } from "../middleware/errorHandler.js";
 
-export async function startAttempt(quizId, studentId) {
+interface AnswerInput {
+  questionId: string;
+  selectedOption?: number | null;
+  textAnswer?: string | null;
+}
+
+export async function startAttempt(quizId: string, studentId: string) {
   const quiz = await prisma.quiz.findUnique({
     where: { id: quizId },
     include: {
@@ -43,7 +49,7 @@ export async function startAttempt(quizId, studentId) {
   };
 }
 
-export async function submitAttempt(attemptId, studentId, answers) {
+export async function submitAttempt(attemptId: string, studentId: string, answers: AnswerInput[]) {
   const attempt = await prisma.attempt.findUnique({
     where: { id: attemptId },
     include: { quiz: { include: { questions: true } } },
@@ -61,14 +67,16 @@ export async function submitAttempt(attemptId, studentId, answers) {
     if (!question) throw new AppError(`Question ${ans.questionId} not found`, 400);
 
     let isCorrect = false;
+    const options = question.options as Array<{ text: string; isCorrect: boolean }> | null;
 
     if (question.type === "MCQ" || question.type === "TRUE_FALSE") {
-      const options = question.options;
-      const correctIndex = options.findIndex((opt) => opt.isCorrect);
-      isCorrect = ans.selectedOption === correctIndex;
+      if (options) {
+        const correctIndex = options.findIndex((opt) => opt.isCorrect);
+        isCorrect = ans.selectedOption === correctIndex;
+      }
     } else if (question.type === "FILL_BLANK") {
       isCorrect =
-        question.correctAnswer &&
+        !!question.correctAnswer &&
         ans.textAnswer?.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
     }
 
@@ -102,7 +110,7 @@ export async function submitAttempt(attemptId, studentId, answers) {
   return updatedAttempt;
 }
 
-export async function getAttempt(attemptId, userId) {
+export async function getAttempt(attemptId: string, userId: string) {
   const attempt = await prisma.attempt.findUnique({
     where: { id: attemptId },
     include: {
@@ -126,8 +134,11 @@ export async function getAttempt(attemptId, userId) {
   return attempt;
 }
 
-export async function getStudentHistory(studentId, quizId) {
-  const where = { studentId, completedAt: { not: null } };
+export async function getStudentHistory(studentId: string, quizId?: string) {
+  const where: { studentId: string; quizId?: string; completedAt: { not: null } } = {
+    studentId,
+    completedAt: { not: null },
+  };
   if (quizId) where.quizId = quizId;
 
   return prisma.attempt.findMany({

@@ -5,3 +5,7 @@ prisma/migrations/*.sql
 dist/
 *.log
 .DS_Store
+
+# Agents
+.agents
+skills-lock.json

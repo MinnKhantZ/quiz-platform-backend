@@ -22,8 +22,6 @@ const mockQuiz = {
 describe("quiz.service", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  // ─── createQuiz ──────────────────────────────────────────────────────────────
-
   describe("createQuiz", () => {
     it("creates a quiz belonging to the teacher", async () => {
       prismaMock.quiz.create.mockResolvedValue(mockQuiz);
@@ -38,8 +36,6 @@ describe("quiz.service", () => {
       expect(result.title).toBe("Math Quiz");
     });
   });
-
-  // ─── getQuizzes ──────────────────────────────────────────────────────────────
 
   describe("getQuizzes", () => {
     it("returns all quizzes with no filter", async () => {
@@ -73,8 +69,6 @@ describe("quiz.service", () => {
     });
   });
 
-  // ─── getQuizById ─────────────────────────────────────────────────────────────
-
   describe("getQuizById", () => {
     it("returns quiz when found", async () => {
       prismaMock.quiz.findUnique.mockResolvedValue(mockQuiz);
@@ -89,8 +83,6 @@ describe("quiz.service", () => {
       await expect(getQuizById("missing")).rejects.toMatchObject({ statusCode: 404 });
     });
   });
-
-  // ─── updateQuiz ──────────────────────────────────────────────────────────────
 
   describe("updateQuiz", () => {
     it("updates quiz when teacher owns it", async () => {
@@ -117,8 +109,6 @@ describe("quiz.service", () => {
       ).rejects.toMatchObject({ statusCode: 404 });
     });
   });
-
-  // ─── deleteQuiz ──────────────────────────────────────────────────────────────
 
   describe("deleteQuiz", () => {
     it("deletes quiz when teacher owns it", async () => {

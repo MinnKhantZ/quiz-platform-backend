@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { AppError } from "../src/middleware/errorHandler.js";
 import { generateToken, verifyToken } from "../src/utils/jwt.js";
 
-// ─── AppError ────────────────────────────────────────────────────────────────
-
 describe("AppError", () => {
   it("sets message and statusCode", () => {
     const err = new AppError("Not found", 404);
@@ -14,15 +12,13 @@ describe("AppError", () => {
   });
 });
 
-// ─── JWT utils ───────────────────────────────────────────────────────────────
-
 describe("jwt utils", () => {
   const payload = { id: "user-uuid", role: "TEACHER" };
 
   it("generateToken returns a non-empty string", () => {
     const token = generateToken(payload);
     expect(typeof token).toBe("string");
-    expect(token.split(".")).toHaveLength(3); // header.payload.signature
+    expect(token.split(".")).toHaveLength(3);
   });
 
   it("verifyToken decodes the original payload", () => {

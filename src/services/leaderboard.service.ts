@@ -1,7 +1,7 @@
 import prisma from "../config/db.js";
 import { AppError } from "../middleware/errorHandler.js";
 
-export async function getQuizAnalytics(quizId, teacherId) {
+export async function getQuizAnalytics(quizId: string, teacherId: string) {
   const quiz = await prisma.quiz.findUnique({ where: { id: quizId } });
   if (!quiz) throw new AppError("Quiz not found", 404);
   if (quiz.teacherId !== teacherId) throw new AppError("Not authorized", 403);
@@ -17,7 +17,14 @@ export async function getQuizAnalytics(quizId, teacherId) {
 
   const totalAttempts = attempts.length;
   if (totalAttempts === 0) {
-    return { totalAttempts: 0, averageScore: 0, averagePercentage: 0, scoreDistribution: [], questionStats: [], recentAttempts: [] };
+    return {
+      totalAttempts: 0,
+      averageScore: 0,
+      averagePercentage: 0,
+      scoreDistribution: [],
+      questionStats: [],
+      recentAttempts: [],
+    };
   }
 
   const averageScore = attempts.reduce((s, a) => s + a.score, 0) / totalAttempts;
@@ -25,10 +32,10 @@ export async function getQuizAnalytics(quizId, teacherId) {
 
   // Score distribution buckets: 0-20, 21-40, 41-60, 61-80, 81-100
   const buckets = [0, 0, 0, 0, 0];
-  attempts.forEach((a) => {
+  for (const a of attempts) {
     const idx = Math.min(Math.floor(a.percentage / 20), 4);
     buckets[idx]++;
-  });
+  }
   const scoreDistribution = [
     { range: "0-20%", count: buckets[0] },
     { range: "21-40%", count: buckets[1] },
@@ -73,7 +80,7 @@ export async function getQuizAnalytics(quizId, teacherId) {
   };
 }
 
-export async function getLeaderboard(quizId) {
+export async function getLeaderboard(quizId: string) {
   const quiz = await prisma.quiz.findUnique({ where: { id: quizId } });
   if (!quiz) throw new AppError("Quiz not found", 404);
 
@@ -85,8 +92,17 @@ export async function getLeaderboard(quizId) {
   });
 
   // Keep only best attempt per student
-  const seen = new Set();
-  const leaderboard = [];
+  const seen = new Set<string>();
+  const leaderboard: Array<{
+    rank: number;
+    student: { id: string; name: string };
+    score: number;
+    totalPoints: number;
+    percentage: number;
+    timeTaken: number;
+    completedAt: Date | null;
+  }> = [];
+
   for (const attempt of attempts) {
     if (!seen.has(attempt.studentId)) {
       seen.add(attempt.studentId);
