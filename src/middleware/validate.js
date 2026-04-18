@@ -1,0 +1,25 @@
+import { AppError } from "./errorHandler.js";
+
+export function validate(schema) {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      const message = result.error.issues.map((i) => i.message).join(", ");
+      return next(new AppError(message, 400));
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+export function validateQuery(schema) {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const message = result.error.issues.map((i) => i.message).join(", ");
+      return next(new AppError(message, 400));
+    }
+    req.query = result.data;
+    next();
+  };
+}

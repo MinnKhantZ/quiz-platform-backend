@@ -1,2 +1,7 @@
-.env
 node_modules/
+.env
+uploads/
+prisma/migrations/*.sql
+dist/
+*.log
+.DS_Store
