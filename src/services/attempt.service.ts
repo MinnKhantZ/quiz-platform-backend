@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../config/db.js";
 import { AppError } from "../middleware/errorHandler.js";
 
@@ -86,7 +87,7 @@ export async function submitAttempt(attemptId: string, studentId: string, answer
     return {
       attemptId,
       questionId: ans.questionId,
-      selectedOption: ans.selectedOption ?? null,
+      selectedOption: ans.selectedOption != null ? ans.selectedOption : Prisma.DbNull,
       textAnswer: ans.textAnswer ?? null,
       isCorrect,
       points,

@@ -1,6 +1,6 @@
+import { Prisma, QuestionType } from "@prisma/client";
 import prisma from "../config/db.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { QuestionType } from "@prisma/client";
 
 interface QuestionData {
   type?: QuestionType;
@@ -21,16 +21,19 @@ export async function addQuestion(quizId: string, teacherId: string, data: Quest
     _max: { order: true },
   });
 
+  const { options, ...restData } = data as {
+    type: QuestionType;
+    text: string;
+    imageUrl?: string | null;
+    options?: Array<{ text: string; isCorrect: boolean }> | null;
+    correctAnswer?: string | null;
+    points?: number;
+  };
+
   return prisma.question.create({
     data: {
-      ...(data as {
-        type: QuestionType;
-        text: string;
-        imageUrl?: string | null;
-        options?: Array<{ text: string; isCorrect: boolean }> | null;
-        correctAnswer?: string | null;
-        points?: number;
-      }),
+      ...restData,
+      options: options === null ? Prisma.DbNull : options,
       quizId,
       order: (maxOrder._max.order ?? -1) + 1,
     },
@@ -45,7 +48,14 @@ export async function updateQuestion(id: string, teacherId: string, data: Questi
   if (!question) throw new AppError("Question not found", 404);
   if (question.quiz.teacherId !== teacherId) throw new AppError("Not authorized", 403);
 
-  return prisma.question.update({ where: { id }, data });
+  const { options, ...restData } = data;
+  return prisma.question.update({
+    where: { id },
+    data: {
+      ...restData,
+      ...(options !== undefined ? { options: options === null ? Prisma.DbNull : options } : {}),
+    },
+  });
 }
 
 export async function deleteQuestion(id: string, teacherId: string) {

@@ -16,7 +16,7 @@ interface QuizData {
   isPublished?: boolean;
 }
 
-export async function createQuiz(teacherId: string, data: QuizData) {
+export async function createQuiz(teacherId: string, data: QuizData & { title: string }) {
   return prisma.quiz.create({
     data: { ...data, teacherId },
     include: { questions: true },

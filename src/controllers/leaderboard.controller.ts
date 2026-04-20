@@ -3,7 +3,7 @@ import * as leaderboardService from "../services/leaderboard.service.js";
 
 export async function analytics(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await leaderboardService.getQuizAnalytics(req.params.quizId, req.user!.id);
+    const data = await leaderboardService.getQuizAnalytics(req.params.quizId as string, req.user!.id);
     res.json(data);
   } catch (err) {
     next(err);
@@ -12,7 +12,7 @@ export async function analytics(req: Request, res: Response, next: NextFunction)
 
 export async function leaderboard(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await leaderboardService.getLeaderboard(req.params.quizId);
+    const data = await leaderboardService.getLeaderboard(req.params.quizId as string);
     res.json(data);
   } catch (err) {
     next(err);

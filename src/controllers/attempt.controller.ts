@@ -3,7 +3,7 @@ import * as attemptService from "../services/attempt.service.js";
 
 export async function start(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await attemptService.startAttempt(req.params.quizId, req.user!.id);
+    const result = await attemptService.startAttempt(req.params.quizId as string, req.user!.id);
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -12,7 +12,7 @@ export async function start(req: Request, res: Response, next: NextFunction): Pr
 
 export async function submit(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await attemptService.submitAttempt(req.params.id, req.user!.id, req.body.answers);
+    const result = await attemptService.submitAttempt(req.params.id as string, req.user!.id, req.body.answers);
     res.json(result);
   } catch (err) {
     next(err);
@@ -21,7 +21,7 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
 
 export async function getById(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const attempt = await attemptService.getAttempt(req.params.id, req.user!.id);
+    const attempt = await attemptService.getAttempt(req.params.id as string, req.user!.id);
     res.json(attempt);
   } catch (err) {
     next(err);

@@ -25,7 +25,7 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
 export async function getById(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const isTeacher = req.user?.role === "TEACHER";
-    const quiz = await quizService.getQuizById(req.params.id, isTeacher);
+    const quiz = await quizService.getQuizById(req.params.id as string, isTeacher);
     res.json(quiz);
   } catch (err) {
     next(err);
@@ -34,7 +34,7 @@ export async function getById(req: Request, res: Response, next: NextFunction): 
 
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const quiz = await quizService.updateQuiz(req.params.id, req.user!.id, req.body);
+    const quiz = await quizService.updateQuiz(req.params.id as string, req.user!.id, req.body);
     res.json(quiz);
   } catch (err) {
     next(err);
@@ -43,7 +43,7 @@ export async function update(req: Request, res: Response, next: NextFunction): P
 
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await quizService.deleteQuiz(req.params.id, req.user!.id);
+    await quizService.deleteQuiz(req.params.id as string, req.user!.id);
     res.json({ message: "Quiz deleted" });
   } catch (err) {
     next(err);
