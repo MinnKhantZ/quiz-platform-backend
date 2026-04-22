@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import logger from "../utils/logger.js";
 
 export class AppError extends Error {
   statusCode: number;
@@ -14,11 +15,21 @@ export class AppError extends Error {
 
 export function errorHandler(
   err: Error & { statusCode?: number; isOperational?: boolean; code?: string },
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
   if (err.isOperational && err.statusCode) {
+    logger.warn(
+      {
+        requestId: req.requestId,
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: err.statusCode,
+        error: err.message,
+      },
+      "Operational error"
+    );
     res.status(err.statusCode).json({ error: err.message });
     return;
   }
@@ -33,6 +44,14 @@ export function errorHandler(
     return;
   }
 
-  console.error("Unexpected error:", err);
+  logger.error(
+    {
+      requestId: req.requestId,
+      method: req.method,
+      path: req.originalUrl,
+      err,
+    },
+    "Unexpected error"
+  );
   res.status(500).json({ error: "Internal server error" });
 }

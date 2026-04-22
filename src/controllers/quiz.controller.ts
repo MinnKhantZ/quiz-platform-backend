@@ -13,8 +13,11 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const isTeacher = req.user?.role === "TEACHER";
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 20);
     const quizzes = await quizService.getQuizzes(
-      isTeacher ? { teacherId: req.user!.id } : { published: true }
+      isTeacher ? { teacherId: req.user!.id } : { published: true },
+      { page, limit }
     );
     res.json(quizzes);
   } catch (err) {

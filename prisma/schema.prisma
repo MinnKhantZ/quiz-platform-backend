@@ -58,6 +58,9 @@ model Quiz {
   liveSessions LiveSession[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+
+  @@index([teacherId])
+  @@index([isPublished, createdAt])
 }
 
 model Question {
@@ -72,6 +75,8 @@ model Question {
   order         Int
   points        Int          @default(1)
   answers       Answer[]
+
+  @@index([quizId, order])
 }
 
 model Attempt {
@@ -87,6 +92,10 @@ model Attempt {
   answers     Answer[]
   startedAt   DateTime  @default(now())
   completedAt DateTime?
+
+  @@index([quizId, completedAt])
+  @@index([studentId, completedAt])
+  @@index([quizId, studentId])
 }
 
 model Answer {
@@ -99,6 +108,9 @@ model Answer {
   textAnswer     String?
   isCorrect      Boolean
   points         Int      @default(0)
+
+  @@index([attemptId])
+  @@index([questionId])
 }
 
 model LiveSession {
@@ -111,4 +123,7 @@ model LiveSession {
   currentQuestion Int           @default(0)
   joinCode        String        @unique
   createdAt       DateTime      @default(now())
+
+  @@index([quizId, status])
+  @@index([teacherId, status])
 }

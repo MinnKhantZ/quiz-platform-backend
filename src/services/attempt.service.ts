@@ -135,15 +135,21 @@ export async function getAttempt(attemptId: string, userId: string) {
   return attempt;
 }
 
-export async function getStudentHistory(studentId: string, quizId?: string) {
+export async function getStudentHistory(studentId: string, quizId?: string, page = 1, limit = 20) {
   const where: { studentId: string; quizId?: string; completedAt: { not: null } } = {
     studentId,
     completedAt: { not: null },
   };
   if (quizId) where.quizId = quizId;
 
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safePage = Math.max(page, 1);
+  const skip = (safePage - 1) * safeLimit;
+
   return prisma.attempt.findMany({
     where,
+    take: safeLimit,
+    skip,
     include: {
       quiz: { select: { id: true, title: true, category: true } },
     },

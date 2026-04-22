@@ -67,6 +67,19 @@ describe("quiz.service", () => {
         expect.objectContaining({ where: { isPublished: true } })
       );
     });
+
+    it("applies pagination options", async () => {
+      prismaMock.quiz.findMany.mockResolvedValue([]);
+
+      await getQuizzes({}, { page: 3, limit: 15 });
+
+      expect(prismaMock.quiz.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 15,
+          skip: 30,
+        })
+      );
+    });
   });
 
   describe("getQuizById", () => {

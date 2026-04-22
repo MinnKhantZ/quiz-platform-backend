@@ -2,6 +2,7 @@ import { Server, Socket } from "socket.io";
 import prisma from "../config/db.js";
 import { verifyToken, JwtPayload } from "../utils/jwt.js";
 import { Question } from "@prisma/client";
+import logger from "../utils/logger.js";
 
 interface AuthenticatedSocket extends Socket {
   user: JwtPayload;
@@ -24,7 +25,7 @@ export function setupSocket(io: Server): void {
 
   io.on("connection", (rawSocket) => {
     const socket = rawSocket as AuthenticatedSocket;
-    console.log(`Socket connected: ${socket.user.id}`);
+    logger.info({ userId: socket.user.id }, "Socket connected");
 
     // Teacher creates a live session
     socket.on("create-session", async ({ quizId }: { quizId: string }, callback: (res: object) => void) => {
@@ -193,7 +194,7 @@ export function setupSocket(io: Server): void {
     });
 
     socket.on("disconnect", () => {
-      console.log(`Socket disconnected: ${socket.user.id}`);
+      logger.info({ userId: socket.user.id }, "Socket disconnected");
     });
   });
 }

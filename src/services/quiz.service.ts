@@ -7,6 +7,11 @@ interface QuizFilter {
   published?: boolean;
 }
 
+interface PaginationInput {
+  page?: number;
+  limit?: number;
+}
+
 interface QuizData {
   title?: string;
   description?: string | null;
@@ -23,13 +28,22 @@ export async function createQuiz(teacherId: string, data: QuizData & { title: st
   });
 }
 
-export async function getQuizzes({ teacherId, published }: QuizFilter = {}) {
+export async function getQuizzes(
+  { teacherId, published }: QuizFilter = {},
+  { page = 1, limit = 20 }: PaginationInput = {}
+) {
   const where: { teacherId?: string; isPublished?: boolean } = {};
   if (teacherId) where.teacherId = teacherId;
   if (published !== undefined) where.isPublished = published;
 
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safePage = Math.max(page, 1);
+  const skip = (safePage - 1) * safeLimit;
+
   return prisma.quiz.findMany({
     where,
+    take: safeLimit,
+    skip,
     include: {
       teacher: { select: { id: true, name: true } },
       _count: { select: { questions: true, attempts: true } },

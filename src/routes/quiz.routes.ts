@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import * as quizController from "../controllers/quiz.controller.js";
 import { authenticate, requireRole } from "../middleware/auth.js";
-import { validate } from "../middleware/validate.js";
+import { validate, validateQuery } from "../middleware/validate.js";
 
 const router = Router();
 
@@ -17,7 +17,12 @@ const createQuizSchema = z.object({
 
 const updateQuizSchema = createQuizSchema.partial();
 
-router.get("/", authenticate, quizController.list);
+const listQuizzesQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+router.get("/", authenticate, validateQuery(listQuizzesQuerySchema), quizController.list);
 router.post("/", authenticate, requireRole("TEACHER"), validate(createQuizSchema), quizController.create);
 router.get("/:id", authenticate, quizController.getById);
 router.put("/:id", authenticate, requireRole("TEACHER"), validate(updateQuizSchema), quizController.update);

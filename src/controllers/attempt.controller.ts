@@ -30,7 +30,12 @@ export async function getById(req: Request, res: Response, next: NextFunction): 
 
 export async function history(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const attempts = await attemptService.getStudentHistory(req.user!.id, req.query.quizId as string | undefined);
+    const attempts = await attemptService.getStudentHistory(
+      req.user!.id,
+      req.query.quizId as string | undefined,
+      Number(req.query.page ?? 1),
+      Number(req.query.limit ?? 20)
+    );
     res.json(attempts);
   } catch (err) {
     next(err);

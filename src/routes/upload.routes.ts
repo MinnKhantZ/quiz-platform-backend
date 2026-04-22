@@ -4,6 +4,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { authenticate, requireRole } from "../middleware/auth.js";
 import env from "../config/env.js";
+import { uploadRateLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -26,7 +27,7 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 
-router.post("/", authenticate, requireRole("TEACHER"), upload.single("image"), (req: Request, res: Response) => {
+router.post("/", uploadRateLimiter, authenticate, requireRole("TEACHER"), upload.single("image"), (req: Request, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: "No file uploaded" });
     return;
