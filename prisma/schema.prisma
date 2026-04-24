@@ -118,21 +118,38 @@ model Answer {
 }
 
 model LiveSession {
-  id              String        @id @default(uuid())
-  quiz            Quiz          @relation(fields: [quizId], references: [id])
+  id              String            @id @default(uuid())
+  quiz            Quiz              @relation(fields: [quizId], references: [id])
   quizId          String
-  teacher         User          @relation(fields: [teacherId], references: [id])
+  teacher         User              @relation(fields: [teacherId], references: [id])
   teacherId       String
-  status          SessionStatus @default(WAITING)
-  currentQuestion Int           @default(0)
-  joinCode        String        @unique
+  status          SessionStatus     @default(WAITING)
+  currentQuestion Int               @default(0)
+  joinCode        String            @unique
+  showResults     Boolean           @default(false)
+  showLeaderboard Boolean           @default(false)
   liveAnswers     LiveAnswer[]
+  participants    LiveParticipant[]
   attempts        Attempt[]
   startedAt       DateTime?
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime          @default(now())
 
   @@index([quizId, status])
   @@index([teacherId, status])
+}
+
+model LiveParticipant {
+  id        String      @id @default(uuid())
+  session   LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  studentId String
+  name      String
+  online    Boolean     @default(true)
+  joinedAt  DateTime    @default(now())
+  leftAt    DateTime?
+
+  @@unique([sessionId, studentId])
+  @@index([sessionId])
 }
 
 model LiveAnswer {

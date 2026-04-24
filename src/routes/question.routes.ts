@@ -9,7 +9,7 @@ const router = Router();
 const addQuestionSchema = z.object({
   type: z.enum(["MCQ", "TRUE_FALSE", "FILL_BLANK"]),
   text: z.string().min(1, "Question text is required"),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.union([z.string().url(), z.string().startsWith("/uploads/")]).optional().nullable(),
   options: z
     .array(z.object({ text: z.string(), isCorrect: z.boolean() }))
     .optional()
