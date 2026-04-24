@@ -20,6 +20,7 @@ export async function startAttempt(quizId: string, studentId: string) {
           text: true,
           imageUrl: true,
           options: true,
+          correctAnswer: true,
           order: true,
           points: true,
         },

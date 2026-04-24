@@ -80,22 +80,26 @@ model Question {
 }
 
 model Attempt {
-  id          String    @id @default(uuid())
-  quiz        Quiz      @relation(fields: [quizId], references: [id])
-  quizId      String
-  student     User      @relation(fields: [studentId], references: [id])
-  studentId   String
-  score       Int       @default(0)
-  totalPoints Int       @default(0)
-  percentage  Float     @default(0)
-  timeTaken   Int       @default(0)
-  answers     Answer[]
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
+  id            String      @id @default(uuid())
+  quiz          Quiz        @relation(fields: [quizId], references: [id])
+  quizId        String
+  student       User        @relation(fields: [studentId], references: [id])
+  studentId     String
+  score         Int         @default(0)
+  totalPoints   Int         @default(0)
+  percentage    Float       @default(0)
+  timeTaken     Int         @default(0)
+  isLive        Boolean     @default(false)
+  liveSession   LiveSession? @relation(fields: [liveSessionId], references: [id])
+  liveSessionId String?
+  answers       Answer[]
+  startedAt     DateTime    @default(now())
+  completedAt   DateTime?
 
   @@index([quizId, completedAt])
   @@index([studentId, completedAt])
   @@index([quizId, studentId])
+  @@index([liveSessionId])
 }
 
 model Answer {
@@ -122,8 +126,27 @@ model LiveSession {
   status          SessionStatus @default(WAITING)
   currentQuestion Int           @default(0)
   joinCode        String        @unique
+  liveAnswers     LiveAnswer[]
+  attempts        Attempt[]
+  startedAt       DateTime?
   createdAt       DateTime      @default(now())
 
   @@index([quizId, status])
   @@index([teacherId, status])
+}
+
+model LiveAnswer {
+  id             String      @id @default(uuid())
+  session        LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId      String
+  studentId      String
+  questionId     String
+  selectedOption Int?
+  textAnswer     String?
+  isCorrect      Boolean     @default(false)
+  answeredAt     DateTime    @default(now())
+
+  @@unique([sessionId, studentId, questionId])
+  @@index([sessionId])
+  @@index([sessionId, studentId])
 }

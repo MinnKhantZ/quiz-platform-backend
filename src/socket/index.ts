@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import prisma from "../config/db.js";
+import { Prisma } from "@prisma/client";
 import { verifyToken, JwtPayload } from "../utils/jwt.js";
 import { Question } from "@prisma/client";
 import logger from "../utils/logger.js";
@@ -75,7 +76,7 @@ export function setupSocket(io: Server): void {
       try {
         const session = await prisma.liveSession.update({
           where: { id: socket.sessionId },
-          data: { status: "IN_PROGRESS", currentQuestion: 0 },
+          data: { status: "IN_PROGRESS", currentQuestion: 0, startedAt: new Date() },
           include: { quiz: { include: { questions: { orderBy: { order: "asc" } } } } },
         });
 
@@ -105,12 +106,18 @@ export function setupSocket(io: Server): void {
 
         const nextIndex = session.currentQuestion + 1;
         if (nextIndex >= session.quiz.questions.length) {
+          // All questions done — finalize session and create attempts
           await prisma.liveSession.update({
             where: { id: session.id },
             data: { status: "FINISHED" },
           });
-          io.to(`session:${session.id}`).emit("session-ended");
-          return callback({ success: true, finished: true });
+
+          const results = await createAttemptsForSession(session.id, session.quizId, session.quiz.questions, session.startedAt);
+
+          // Notify students (teacher is excluded via socket.to)
+          socket.to(`session:${session.id}`).emit("session-finished", { results });
+
+          return callback({ success: true, finished: true, results });
         }
 
         await prisma.liveSession.update({
@@ -170,6 +177,30 @@ export function setupSocket(io: Server): void {
             isCorrect,
           });
 
+          // Persist to LiveAnswer (upsert handles retries gracefully)
+          await prisma.liveAnswer.upsert({
+            where: {
+              sessionId_studentId_questionId: {
+                sessionId: socket.sessionId!,
+                studentId: socket.user.id,
+                questionId,
+              },
+            },
+            update: {
+              selectedOption: typeof selectedOption === "number" ? selectedOption : null,
+              textAnswer: textAnswer ?? null,
+              isCorrect,
+            },
+            create: {
+              sessionId: socket.sessionId!,
+              studentId: socket.user.id,
+              questionId,
+              selectedOption: typeof selectedOption === "number" ? selectedOption : null,
+              textAnswer: textAnswer ?? null,
+              isCorrect,
+            },
+          });
+
           callback({ success: true, isCorrect });
         } catch (err) {
           callback({ success: false, error: (err as Error).message });
@@ -177,7 +208,20 @@ export function setupSocket(io: Server): void {
       }
     );
 
-    // Teacher ends session
+    // Teacher toggles result/leaderboard visibility for students
+    socket.on(
+      "set-session-state",
+      ({ showResults, showLeaderboard }: { showResults: boolean; showLeaderboard: boolean }, callback: (res: object) => void) => {
+        try {
+          socket.to(`session:${socket.sessionId}`).emit("session-state", { showResults, showLeaderboard });
+          callback({ success: true });
+        } catch (err) {
+          callback({ success: false, error: (err as Error).message });
+        }
+      }
+    );
+
+    // Teacher ends session (terminate)
     socket.on("end-session", async (callback: (res: object) => void) => {
       try {
         if (socket.sessionId) {
@@ -185,7 +229,7 @@ export function setupSocket(io: Server): void {
             where: { id: socket.sessionId },
             data: { status: "FINISHED" },
           });
-          io.to(`session:${socket.sessionId}`).emit("session-ended");
+          io.to(`session:${socket.sessionId}`).emit("session-terminated");
         }
         callback({ success: true });
       } catch (err) {
@@ -218,4 +262,89 @@ function sanitizeQuestion(question: Question) {
     options: options?.map((o) => ({ text: o.text })),
     points: question.points,
   };
+}
+
+interface LiveResult {
+  studentId: string;
+  studentName: string;
+  score: number;
+  totalPoints: number;
+  percentage: number;
+  attemptId: string;
+}
+
+async function createAttemptsForSession(
+  sessionId: string,
+  quizId: string,
+  questions: Question[],
+  sessionStartedAt: Date | null = null
+): Promise<LiveResult[]> {
+  const liveAnswers = await prisma.liveAnswer.findMany({
+    where: { sessionId },
+  });
+
+  // Group answers by student
+  const answersByStudent = new Map<string, typeof liveAnswers>();
+  for (const ans of liveAnswers) {
+    if (!answersByStudent.has(ans.studentId)) answersByStudent.set(ans.studentId, []);
+    answersByStudent.get(ans.studentId)!.push(ans);
+  }
+
+  if (answersByStudent.size === 0) return [];
+
+  const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
+
+  const results = await Promise.all(
+    Array.from(answersByStudent.entries()).map(async ([studentId, studentAnswers]) => {
+      let score = 0;
+      const answerData = questions.map((q) => {
+        const ans = studentAnswers.find((a) => a.questionId === q.id);
+        const isCorrect = ans?.isCorrect ?? false;
+        const points = isCorrect ? q.points : 0;
+        score += points;
+        return {
+          questionId: q.id,
+          selectedOption: ans?.selectedOption != null ? ans.selectedOption : Prisma.DbNull,
+          textAnswer: ans?.textAnswer ?? null,
+          isCorrect,
+          points,
+        };
+      });
+
+      const percentage = totalPoints > 0 ? (score / totalPoints) * 100 : 0;
+
+      const completedAt = new Date();
+      const timeTaken = sessionStartedAt
+        ? Math.floor((completedAt.getTime() - sessionStartedAt.getTime()) / 1000)
+        : 0;
+
+      const attempt = await prisma.attempt.create({
+        data: {
+          quizId,
+          studentId,
+          score,
+          totalPoints,
+          percentage,
+          timeTaken,
+          completedAt,
+          isLive: true,
+          liveSessionId: sessionId,
+          answers: { create: answerData },
+        },
+        include: { student: { select: { id: true, name: true } } },
+      });
+
+      return {
+        studentId,
+        studentName: attempt.student.name,
+        score,
+        totalPoints,
+        percentage: Math.round(percentage * 100) / 100,
+        attemptId: attempt.id,
+      };
+    })
+  );
+
+  results.sort((a, b) => b.score - a.score || a.studentName.localeCompare(b.studentName));
+  return results;
 }
